@@ -1,3 +1,5 @@
 /.idea
 /target
 /content.json
+
+.DS_Store

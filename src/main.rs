@@ -9,7 +9,7 @@ use cli::{Cli, Commands};
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    utils::logger::init_verbose(cli.verbose);
+    utils::logger::init(cli.verbose);
 
     // Match the subcommand and call its run function
     match &cli.command {

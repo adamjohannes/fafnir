@@ -1,7 +1,7 @@
 use crate::cli::CollectArgs;
-use crate::utils::logger;
 use anyhow::{Context, Result};
 use ignore::{overrides::OverrideBuilder, DirEntry, WalkBuilder};
+use log::info;
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::Path;
@@ -16,19 +16,22 @@ pub fn run(args: &CollectArgs) -> Result<()> {
     // Add patterns from --ignore-all
     for pattern in &args.ignore_all {
         // '!' makes it an ignore rule, not a whitelist
-        override_builder.add(&format!("!**/{}", pattern))
+        override_builder
+            .add(&format!("!**/{}", pattern))
             .context(format!("Failed to add ignore-all pattern: {}", pattern))?;
     }
 
     // Add patterns from --ignore
     for pattern in &args.ignore {
-        override_builder.add(&format!("!{}", pattern))
+        override_builder
+            .add(&format!("!{}", pattern))
             .context(format!("Failed to add ignore pattern: {}", pattern))?;
     }
 
     // Always ignore the output file itself
     if let Some(output_filename) = args.output_file.to_str() {
-        override_builder.add(&format!("!{}", output_filename))
+        override_builder
+            .add(&format!("!{}", output_filename))
             .context(format!("Failed to ignore output file: {}", output_filename))?;
     }
 
@@ -55,10 +58,10 @@ pub fn run(args: &CollectArgs) -> Result<()> {
     serde_json::to_writer_pretty(file, &final_json)
         .context("Failed to write JSON to output file")?;
 
-    logger::info(&format!(
+    info!(
         "Repository content successfully saved to {:?}",
         &args.output_file
-    ));
+    );
     Ok(())
 }
 

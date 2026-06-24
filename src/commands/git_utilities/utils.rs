@@ -1,6 +1,6 @@
 use crate::cli::RemoteOperationArgs;
-use crate::utils::logger;
 use anyhow::{Context, Result};
+use log::{debug, error, info, warn};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -13,7 +13,10 @@ pub enum RepoStatus {
     Ok,
 }
 
-pub fn run_with_action<F>(args: &RemoteOperationArgs, mut on_ok: F) -> anyhow::Result<(), anyhow::Error>
+pub fn run_with_action<F>(
+    args: &RemoteOperationArgs,
+    mut on_ok: F,
+) -> anyhow::Result<(), anyhow::Error>
 where
     F: FnMut(PathBuf) -> Result<(), anyhow::Error>,
 {
@@ -25,7 +28,7 @@ where
     for dir in &args.directories {
         // Confirm that the path is a valid direct
         if !dir.is_dir() {
-            logger::error(&format!("Not a directory: '{}'", dir.display()));
+            error!("Not a directory: '{}'", dir.display());
             continue;
         }
 
@@ -37,7 +40,7 @@ where
             let path = entry.path();
 
             if path.is_dir() {
-                logger::debug(&format!("Checking '{}'", path.display()));
+                debug!("Checking '{}'", path.display());
                 // 3. Get directory status
                 match check_repo_status(&path)? {
                     Some(RepoStatus::Uncommitted) => uncommitted.push(path),
@@ -47,7 +50,7 @@ where
                         on_ok(path)?;
                     }
                     None => {
-                        logger::warning(&format!("Not a git repository: '{}'", path.display()));
+                        warn!("Not a git repository: '{}'", path.display());
                     }
                 }
             }
@@ -55,11 +58,7 @@ where
     }
 
     // 4. Report to the user the results
-    print_report(
-        &uncommitted,
-        &no_upstream,
-        &not_pushed,
-    )?;
+    print_report(&uncommitted, &no_upstream, &not_pushed)?;
 
     Ok(())
 }
@@ -125,14 +124,14 @@ fn print_report(
     not_pushed: &[PathBuf],
 ) -> Result<()> {
     if !uncommitted.is_empty() {
-        logger::info("The following directories contain uncommitted changes:");
+        info!("The following directories contain uncommitted changes:");
         for dir in uncommitted {
             println!("{}", dir.display().to_string());
         }
     }
 
     if !no_upstream.is_empty() {
-        logger::info("The following directories do not have an upstream branch set:");
+        info!("The following directories do not have an upstream branch set:");
         for dir in no_upstream {
             println!("{}", dir.display().to_string());
             let branch_output = Command::new("git")
@@ -143,21 +142,18 @@ fn print_report(
                 .arg("HEAD")
                 .output()?;
             let branch = String::from_utf8(branch_output.stdout)?.trim().to_string();
-            logger::info(
-                &format!(
-                    "Remote branch 'origin/{}' exists. To link it, run: git -C {} branch --set-upstream-to=origin/{} {}",
-                    branch,
-                    dir.display(),
-                    branch,
-                    branch
-                ));
+            info!(
+                "Remote branch 'origin/{}' exists. To link it, run: git -C {} branch --set-upstream-to=origin/{} {}",
+                branch,
+                dir.display(),
+                branch,
+                branch
+            );
         }
     }
 
     if !not_pushed.is_empty() {
-        logger::info(
-            "The following directories contain changes that were committed but not yet pushed:",
-        );
+        info!("The following directories contain changes that were committed but not yet pushed:",);
         for dir in not_pushed {
             println!("{}", dir.display().to_string());
         }

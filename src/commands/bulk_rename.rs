@@ -1,7 +1,7 @@
 use crate::cli::BulkRenameArgs;
-use crate::utils::logger;
 use anyhow::{Context, Result};
 use globset::{Glob, GlobMatcher};
+use log::{debug, error, info, warn};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,16 +20,19 @@ pub fn run(args: &BulkRenameArgs) -> Result<()> {
 
             let search_root = infer_search_root(raw)?;
             if !search_root.exists() {
-                logger::warning(&format!(
+                warn!(
                     "Skipping '{}': inferred search root '{}' does not exist",
                     raw,
                     search_root.display()
-                ));
+                );
                 continue;
             }
 
             if args.recursive {
-                for entry in WalkDir::new(&search_root).into_iter().filter_map(|e| e.ok()) {
+                for entry in WalkDir::new(&search_root)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
                     if entry.file_type().is_file() && is_match(&matcher, raw, entry.path()) {
                         candidates.push(Candidate::glob(entry.into_path()));
                     }
@@ -56,7 +59,7 @@ pub fn run(args: &BulkRenameArgs) -> Result<()> {
             if p.exists() {
                 candidates.push(Candidate::explicit(p));
             } else {
-                logger::warning(&format!("Path not found: {}", raw));
+                warn!("Path not found: {}", raw);
             }
         }
     }
@@ -80,10 +83,10 @@ pub fn run(args: &BulkRenameArgs) -> Result<()> {
     for c in candidates {
         // Skip directories that originated from a glob match (Scenario 1 safeguard).
         if c.kind == Source::Glob && c.path.is_dir() {
-            logger::debug(&format!(
+            debug!(
                 "Skipping directory matched via glob: {}",
                 c.path.display()
-            ));
+            );
             skipped += 1;
             continue;
         }
@@ -91,17 +94,17 @@ pub fn run(args: &BulkRenameArgs) -> Result<()> {
         let new_path = compute_target_path(&c.path, &args.replacement)?;
 
         if new_path == c.path {
-            logger::debug(&format!("Unchanged (same name): {}", c.path.display()));
+            debug!("Unchanged (same name): {}", c.path.display());
             skipped += 1;
             continue;
         }
 
         if new_path.exists() {
-            logger::error(&format!(
+            error!(
                 "Target already exists, skipping: '{}' -> '{}'",
                 c.path.display(),
                 new_path.display()
-            ));
+            );
             skipped += 1;
             continue;
         }
@@ -114,15 +117,15 @@ pub fn run(args: &BulkRenameArgs) -> Result<()> {
             )
         })?;
 
-        logger::info(&format!(
+        info!(
             "Renamed '{}' -> '{}'",
             c.path.display(),
             new_path.display()
-        ));
+        );
         renamed += 1;
     }
 
-    logger::info(&format!("Done. Renamed: {renamed}, Skipped: {skipped}."));
+    info!("Done. Renamed: {renamed}, Skipped: {skipped}.");
     Ok(())
 }
 
@@ -139,10 +142,16 @@ struct Candidate {
 
 impl Candidate {
     fn explicit(path: PathBuf) -> Self {
-        Self { path, kind: Source::Explicit }
+        Self {
+            path,
+            kind: Source::Explicit,
+        }
     }
     fn glob(path: PathBuf) -> Self {
-        Self { path, kind: Source::Glob }
+        Self {
+            path,
+            kind: Source::Glob,
+        }
     }
 }
 
@@ -167,7 +176,10 @@ fn infer_search_root(pattern: &str) -> Result<PathBuf> {
     if let Some(mi) = first_meta_idx {
         // find last separator before meta
         let before = &pattern[..mi];
-        let sep_idx = before.rmatch_indices(|c: char| c == '/' || c == '\\').next().map(|x| x.0);
+        let sep_idx = before
+            .rmatch_indices(|c: char| c == '/' || c == '\\')
+            .next()
+            .map(|x| x.0);
         let root = if let Some(si) = sep_idx {
             &before[..=si] // include the separator
         } else {

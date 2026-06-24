@@ -7,6 +7,6 @@ pub fn run(args: &RemoteOperationArgs) -> Result<()> {
     run_with_action(args, on_ok_check)
 }
 
-fn on_ok_check(path: PathBuf) -> Result<(), anyhow::Error> {
+fn on_ok_check(_path: PathBuf) -> Result<(), anyhow::Error> {
     Ok(())
 }
